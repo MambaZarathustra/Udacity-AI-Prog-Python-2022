@@ -32,90 +32,90 @@ model.to(device)
 
 ####################################################################################################
 
-## TRAIN AND EVAL THE NETWORK ##
+## TRAIN NETWORK and VALIDATE 
 
-# Set epochs hyperparameter
-epochs = 5
-
-# Initialize running loss 
+# Set epochs hyperparameter & Initial running loss
+epochs = 2
 running_loss = 0
 
-# Initializ # of steps for Eval check
+# Initialize # of steps for Eval check
 steps = 0
-print_every = 5
+print_every = 10
+
 
 for e in range(epochs):
     
     # Training pass for each epoch
     for images, labels in trainloader:
         
-        # Keep track of 'steps' for test 'if' clause
+        # Keep track of 'steps' for testing 'if' clause
         steps += 1
         
-        # Move input, labels tensors to the 'device' memory
+        # Move images, labels tensors to 'device' memory
         images, labels = images.to(device), labels.to(device)
         
-        # Clear accumulated gradients from the last pass
+        # Clean accumulated gradients from last pass
         optimizer.zero_grad()
         
-        # Forward pass, loss calc, backward pass, update weights 
-        log_ps = model.forward(images)
+        # Forward pass, loss calc, backward pass, update weights
+        log_ps = model(images)
         loss = criterion(log_ps, labels)
         loss.backward
         optimizer.step()
         
-        running_loss += loss.item()
+        running_loss = loss.item()
         
-        # Test the model every 'print_every' steps (irrespective of epoch)
+        # Test model every 'print_every' steps (irrespective of epoch)
+        # using validation dataset
         if steps % print_every == 0:
             
-            # Initialize test_loss and accuracy variables
-            test_loss = 0
+            # Initialize test loss and accuracy variables
+            valid_loss = 0
             accuracy = 0
             
             # Turn off gradients for Eval pass of the model
             with torch.no_grad():
-                
-                # Put model into Eval mode, i.e. no dropout
+            
+                # Trun off gradients for Eval pass of the model
                 model.eval()
-                
-                # Start Eval pass with its set of images w/in batch
-                for test_img, labels in testloader:
-                    
-                    # Move input, labels tensors to the 'device'
-                    test_img, labels = test_img.to(device), labels.to(device)
-                    
-                    # 1 fwd pass and loss calc for this batch of images
-                    log_ps = model.forward(test_img)
-                    image_loss = crietrion(log_ps, labels)
-                    
-                    # Add up test loss
-                    test_loss += image_loss.item()
-                    
-                    
-                    ## Calculate the accuracy
-                    # Convert log (softmax) probabilities to prob distribution
+
+                # Start Eval pass w/ its own set of images w/in the batch
+                for valid_img, valid_labels in validatorloader:
+
+                    # Move to valid_img, valid_labels tensors to 'device' memory
+                    valid_img, valid_labels = valid_img.to(device), valid_labels.to(device)
+
+                    # 1 forward pass, loss calc for the batch of images
+                    log_ps = model(valid_img)
+                    loss = criterion(log_ps, valid_labels)
+
+                    # Add up validation pass losses
+                    valid_loss = loss.item()
+
+                    # Calculate accuracy
+                    # Convert log(softmax) prob to prob distribution
                     ps = torch.exp(log_ps)
-                    
+
                     # Get 'top_class' from 'topk' and equivocate the prediction
-                    # and label tensor (i.e. same dimensions)
-                    # 1 means 1st largest value in our probabilities
+                    # and valid_labels tensor (i.e. same dimensions)
+                    # 1 = 1st largest value in prob distribution
                     top_k, top_class = ps.topk(1, dim=1)
-                    equals = top_class == labels.view(*top_class.shape)
-                    
-                    # Convert 'equals' into a FloatTensor, then calc mean
-                    accuracy += torch.mean(equals.type(torch.FloatTensor)) #.item() ??
-                    
-                
-            # Print data on this Training and Testing pass
-            # Total loss / # of batches = average loss
-            print(f"Epoch {e+1}/{e}.."
-                  f"Train loss: {running_loss/print_every:.3f}.."
-                  f"Test loss: {test_loss/len(testloader):.3f}.."
-                  f"Test Accuracy: {accuracy/len(testloader):.3f}..")
+                    equals = top_class == valid_labels.view(*top_class.shape)
 
-            # Reset running loss to 0 ?????
+                    # Convert 'equals' to a FloatTensor, then calc mean
+                    accuracy += torch.mean(equals.type(torch.FloatTensor))
+
+            # Print data on this Training and Validation pass
+            print(f"Epoch {e+1}/{epochs}.."
+                  f"Training loss: {running_loss/print_every:.3f}.. "
+                  f"Validation loss: {valid_loss/len(validatorloader):.3f}.."
+                  f"Validation accuracy: {accuracy/len(validatorloader):.3f}..")
+            
+            
+            # Reset running loss to 0
             running_loss = 0
-
-            # Set model back to train mode
+                  
+            # Set model backto training mode
             model.train()
+                
+                
